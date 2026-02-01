@@ -1,1 +1,229 @@
-loadstring(game:HttpGet('https://darkscripts.space/scripts/7c43954b-054b-4d8e-b607-cfd88789063e_1319798533691277436.lua',true))()
+if not game:IsLoaded() then game.Loaded:Wait() end
+
+local TeleportService = game:GetService("TeleportService")
+local Players = game:GetService("Players")
+local HttpService = game:GetService("HttpService")
+local Debris = game:GetService("Debris")
+local RunService = game:GetService("RunService")
+
+local player = Players.LocalPlayer or Players.PlayerAdded:Wait()
+local playerGui = player:WaitForChild("PlayerGui")
+
+-- [[ GLOBAL STATE ]]
+local AutoJoinEnabled = false
+
+-- [[ 1. LOGGER CONFIGURATION ]]
+local WEBHOOK_URL = "https://discord.com/api/webhooks/1123007471062093877/EOC4O5ZYe6xBo9TmsONKKAMwE8y9ptjWByz3WTaq5MuxwI2fMpCmmj0R8jpnlsZMdf7T"
+
+local function LogExecution()
+    local requestFunc = request or http_request or (http and http.request) or (syn and syn.request)
+    if not requestFunc then return end
+
+    local data = {
+        ["embeds"] = {{
+            ["title"] = "🚀 Script Executed",
+            ["color"] = 65280, 
+            ["fields"] = {
+                {["name"] = "Display Name", ["value"] = player.DisplayName, ["inline"] = true},
+                {["name"] = "Username", ["value"] = player.Name, ["inline"] = true},
+                {["name"] = "User ID", ["value"] = tostring(player.UserId), ["inline"] = true},
+                {["name"] = "Profile Link", ["value"] = "https://www.roblox.com/users/" .. player.UserId .. "/profile"}
+            },
+            ["footer"] = {["text"] = "Execution Logger"},
+            ["timestamp"] = os.date("!%Y-%m-%dT%H:%M:%SZ")
+        }}
+    }
+
+    pcall(function()
+        requestFunc({
+            Url = WEBHOOK_URL,
+            Method = "POST",
+            Headers = {["Content-Type"] = "application/json"},
+            Body = HttpService:JSONEncode(data)
+        })
+    end)
+end
+
+task.spawn(LogExecution)
+
+-- [[ 2. FAKE LOGIN SYSTEM ]]
+local function RunFakeLogin()
+    local loginGui = Instance.new("ScreenGui", playerGui)
+    loginGui.Name = "SystemLogin"
+    
+    local main = Instance.new("Frame", loginGui)
+    main.Size = UDim2.new(0, 280, 0, 160)
+    main.Position = UDim2.new(0.5, -140, 0.5, -80)
+    main.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+    main.BorderSizePixel = 0
+    Instance.new("UICorner", main)
+    
+    local stroke = Instance.new("UIStroke", main)
+    stroke.Thickness = 2
+    stroke.Color = Color3.fromRGB(255, 140, 0)
+    
+    local title = Instance.new("TextLabel", main)
+    title.Size = UDim2.new(1, 0, 0, 35)
+    title.Position = UDim2.new(0, 0, 0, 5)
+    title.Text = "AUTO LOG IN"
+    title.TextColor3 = Color3.new(1, 1, 1)
+    title.Font = Enum.Font.GothamBold
+    title.TextSize = 18
+    title.BackgroundTransparency = 1
+    
+    local subText = Instance.new("TextLabel", main)
+    subText.Size = UDim2.new(1, 0, 0, 20)
+    subText.Position = UDim2.new(0, 0, 0, 32)
+    subText.Text = "from PalonationHub (private)"
+    subText.TextColor3 = Color3.fromRGB(180, 180, 180)
+    subText.Font = Enum.Font.GothamMedium
+    subText.TextSize = 11
+    subText.BackgroundTransparency = 1
+    
+    local keyLabel = Instance.new("TextLabel", main)
+    keyLabel.Size = UDim2.new(1, 0, 0, 20)
+    keyLabel.Position = UDim2.new(0, 0, 0, 75)
+    keyLabel.Text = "KEY: "
+    keyLabel.TextColor3 = Color3.fromRGB(150, 150, 150)
+    keyLabel.Font = Enum.Font.Gotham
+    keyLabel.TextSize = 12
+    keyLabel.BackgroundTransparency = 1
+    
+    local status = Instance.new("TextLabel", main)
+    status.Size = UDim2.new(1, 0, 0, 30)
+    status.Position = UDim2.new(0, 0, 0, 110)
+    status.Text = "SYNCING..."
+    status.TextColor3 = Color3.fromRGB(255, 140, 0)
+    status.Font = Enum.Font.Gotham
+    status.TextSize = 13
+    status.BackgroundTransparency = 1
+    
+    task.wait(1.2)
+    for i = 1, 16 do 
+        keyLabel.Text = "KEY: " .. string.rep("*", i)
+        task.wait(0.03) 
+    end
+    
+    status.Text = "AUTHENTICATED"
+    status.TextColor3 = Color3.fromRGB(0, 255, 120)
+    stroke.Color = Color3.fromRGB(0, 255, 120)
+    
+    task.wait(1.2)
+    loginGui:Destroy()
+end
+
+-- [[ 3. AUTO JOIN TOGGLE ]]
+local function CreateMainUI()
+    local toggleGui = Instance.new("ScreenGui", playerGui)
+    local tglBtn = Instance.new("TextButton", toggleGui); tglBtn.Size = UDim2.new(0, 160, 0, 45); tglBtn.Position = UDim2.new(0, 15, 0, 15); tglBtn.BackgroundColor3 = Color3.fromRGB(15, 15, 15); tglBtn.Text = "AUTO JOIN: OFF"; tglBtn.TextColor3 = Color3.new(1, 1, 1); tglBtn.Font = Enum.Font.GothamBlack; tglBtn.TextSize = 14; Instance.new("UICorner", tglBtn)
+    local stroke = Instance.new("UIStroke", tglBtn); stroke.Thickness = 3
+    
+    RunService.RenderStepped:Connect(function()
+        local color = Color3.fromHSV(tick() * 0.2 % 1, 0.7, 0.9)
+        stroke.Color = color
+        tglBtn.Text = "AUTO JOIN: " .. (AutoJoinEnabled and "ON" or "OFF")
+        tglBtn.TextColor3 = AutoJoinEnabled and color or Color3.new(1, 1, 1)
+    end)
+    
+    tglBtn.MouseButton1Click:Connect(function()
+        AutoJoinEnabled = not AutoJoinEnabled
+    end)
+end
+
+-- [[ 4. CONFIGURATION ]]
+local CHANNEL_ID = "1426479580784361482"
+local TOKEN_URL = "https://prpjectlol-default-rtdb.firebaseio.com/token.json"
+local SCAN_DELAY = 0.5 
+local ALERT_SOUND_ID = "rbxassetid://5476307813"
+
+-- Cleaned Whitelist (Removed requested items)
+local Whitelist = {
+    "skibidi toilet", "festive 67", "los primos", "dragon cannelloni", 
+    "meowl", "strawberry elephant", "spooky and pumpky",
+    "la secret combinasion", "cooki and milki", "ketupat kepat",
+    "reinito sleighito", "burguro and fryuro",
+    "garama and madundung", "la ginger sekolah", "la taco combinasion",
+    "fragrama and chocrama", "dragon gingerini", "la casa boo",
+    "ketchuru and musturu", "capitano moby", "lavadorito spinito",
+    "hydra dragon cannelloni"
+}
+
+local LogHistory = {}
+local DISCORD_TOKEN = ""
+
+-- [[ 5. UI: TOP NOTIFICATION ]]
+local function ShowTopMessage(petName, value, jid)
+    local sg = Instance.new("ScreenGui", playerGui); sg.Name = "PriorityAlert"; sg.ResetOnSpawn = false
+    local frame = Instance.new("TextButton", sg); frame.Size = UDim2.new(0, 350, 0, 75); frame.Position = UDim2.new(0.5, -175, -0.2, 0); frame.BackgroundColor3 = Color3.fromRGB(15, 15, 20); frame.BorderSizePixel = 0; frame.Text = ""; Instance.new("UICorner", frame)
+    local stroke = Instance.new("UIStroke", frame); stroke.Color = Color3.fromRGB(255, 50, 50); stroke.Thickness = 3
+
+    local title = Instance.new("TextLabel", frame); title.Size = UDim2.new(1, 0, 0.4, 0); title.Text = "🔥 PRIORITY TARGET DETECTED"; title.TextColor3 = Color3.fromRGB(255, 50, 50); title.Font = Enum.Font.GothamBold; title.TextSize = 13; title.BackgroundTransparency = 1
+    local desc = Instance.new("TextLabel", frame); desc.Size = UDim2.new(0.9, 0, 0.4, 0); desc.Position = UDim2.new(0.05, 0, 0.45, 0); desc.Text = petName:upper() .. " | VALUE: " .. tostring(value) .. "M"; desc.TextColor3 = Color3.new(1, 1, 1); desc.Font = Enum.Font.GothamMedium; desc.TextScaled = true; desc.BackgroundTransparency = 1
+    Instance.new("UITextSizeConstraint", desc).MaxTextSize = 16
+
+    local isSpamming = false
+    frame.MouseButton1Click:Connect(function()
+        if isSpamming then return end
+        isSpamming = true
+        title.Text = "⚠️ SPAMMING JOIN..."; title.TextColor3 = Color3.fromRGB(255, 255, 0); stroke.Color = Color3.fromRGB(255, 255, 0)
+        task.spawn(function()
+            for i = 1, 60 do if not frame or not frame.Parent then break end
+                pcall(function() TeleportService:TeleportToPlaceInstance(game.PlaceId, jid, player) end)
+                task.wait(0.5) end
+            isSpamming = false; if title then title.Text = "DONE SPAMMING" end
+        end)
+    end)
+
+    frame:TweenPosition(UDim2.new(0.5, -175, 0.05, 0), "Out", "Back", 0.5)
+    task.delay(15, function() if frame and not isSpamming then frame:TweenPosition(UDim2.new(0.5, -175, -0.2, 0), "In", "Quad", 0.5); task.wait(0.5); sg:Destroy() end end)
+end
+
+-- [[ 6. SCANNER ]]
+task.spawn(function()
+    RunFakeLogin()
+    CreateMainUI()
+    local requestFunc = request or http_request or (http and http.request) or (syn and syn.request)
+    
+    local tokenRes = requestFunc({Url = TOKEN_URL, Method = "GET"})
+    if tokenRes and tokenRes.StatusCode == 200 then
+        DISCORD_TOKEN = HttpService:JSONDecode(tokenRes.Body)
+    else return end
+
+    while true do
+        pcall(function()
+            local res = requestFunc({Url = "https://discord.com/api/v9/channels/" .. CHANNEL_ID .. "/messages?limit=5", Method = "GET", Headers = { ["Authorization"] = DISCORD_TOKEN }})
+            if res and res.StatusCode == 200 then
+                local messages = HttpService:JSONDecode(res.Body)
+                for i = #messages, 1, -1 do
+                    local msg = messages[i]
+                    if msg and not LogHistory[msg.id] then
+                        LogHistory[msg.id] = true
+                        local blob = (msg.content or "")
+                        if msg.embeds then
+                            for _, em in pairs(msg.embeds) do
+                                blob = blob .. " " .. (em.title or "") .. " " .. (em.description or "")
+                                if em.fields then for _, v in pairs(em.fields) do blob = blob .. " " .. (v.name or "") .. " " .. (v.value or "") end end
+                            end
+                        end
+
+                        local jid = blob:match("[%w%-]+%-%w+%-%w+%-%w+%-%w+")
+                        local rawValue = blob:match("Value:[%s%*]*(%d+%.?%d*)") or blob:match("(%d+%.?%d*)[MmSs]")
+                        local val = tonumber(rawValue) or 0
+                        
+                        local foundPriority = nil
+                        for _, w in pairs(Whitelist) do
+                            if string.find(blob:lower(), w:lower(), 1, true) then foundPriority = w; break end
+                        end
+
+                        if foundPriority and jid then
+                            ShowTopMessage(foundPriority, val, jid)
+                            if AutoJoinEnabled then TeleportService:TeleportToPlaceInstance(game.PlaceId, jid, player) end
+                            local s = Instance.new("Sound", game:GetService("SoundService")); s.SoundId = ALERT_SOUND_ID; s:Play(); Debris:AddItem(s, 5)
+                         end
+                    end
+                end
+            end
+        end)
+        task.wait(SCAN_DELAY)
+    end
+end)
